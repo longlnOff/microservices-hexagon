@@ -22,11 +22,12 @@ down-to:
 	
 migration-create:
 	goose create -s $(name) sql
-
+test-order-create-grpc:
+	grpcurl -d '{"user_id": 123, "order_items": [{"product_code": "prod", "quantity": 4, "unit_price": 12}]}' -plaintext localhost:9000 Order/Create
 
 # Database
 run-postgres-db:
-	docker run --name e_commercial_postgres -e POSTGRES_USER=longln -e POSTGRES_PASSWORD=mysecretpassword -p 5432:5432 -d postgres:16-alpine
+	docker run --name e_commercial_postgres -e POSTGRES_USER=longln -e POSTGRES_PASSWORD=mysecretpassword -p 5433:5432 -d postgres:16-alpine
 
 create-db:
 	docker exec -it e_commercial_postgres createdb --username=longln --owner=longln order

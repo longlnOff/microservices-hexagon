@@ -65,7 +65,7 @@ type HTTPServerConfiguration struct {
 
 type GRPCServerConfiguration struct {
 	GRPC_SERVER_ADDRESS   string `mapstructure:"GRPC_SERVER_ADDRESS"`
-	GRPC_SERVER_PORT      string `mapstructure:"GRPC_SERVER_PORT"`
+	GRPC_SERVER_PORT      int	 `mapstructure:"GRPC_SERVER_PORT"`
 	GRPC_ENVIRONMENT      string `mapstructure:"GRPC_ENVIRONMENT"`
 	GRPC_VERSION          string `mapstructure:"GRPC_VERSION"`
 	GRPC_EXTERNAL_ADDRESS string `mapstructure:"GRPC_EXTERNAL_ADDRESS"`
@@ -83,12 +83,17 @@ type DatabaseConfiguration struct {
 	DB_MAX_IDLE_CONNS int           `mapstructure:"DB_MAX_IDLE_CONNS"`
 	DB_MAX_IDLE_TIME  time.Duration `mapstructure:"DB_MAX_IDLE_TIME"`
 	DB_SSL_MODE       string        `mapstructure:"DB_SSL_MODE"`
+	MIGRATE_UP        bool          `mapstructure:"MIGRATE_UP"`
+	MIGRATE_VERSION	  int           `mapstructure:"MIGRATE_VERSION"`
 }
 
-func LoadConfig(path string) (cfg Configuration, err error) {
-	viper.AddConfigPath(path)
-	viper.SetConfigType("env")
-	viper.SetConfigFile(".env")
+func LoadConfig(path string, useAbsPath bool) (cfg Configuration, err error) {
+	if useAbsPath {
+		viper.AddConfigPath(path)
+		viper.SetConfigType("env")
+		viper.SetConfigFile(".env")
+	}
+
 	viper.AutomaticEnv()
 
 	if err = viper.ReadInConfig(); err != nil {
@@ -138,6 +143,8 @@ func LoadConfig(path string) (cfg Configuration, err error) {
 		DB_MAX_IDLE_CONNS: viper.GetInt("DB_MAX_IDLE_CONNS"),
 		DB_MAX_IDLE_TIME:  viper.GetDuration("DB_MAX_IDLE_TIME"),
 		DB_SSL_MODE:       viper.GetString("DB_SSL_MODE"),
+		MIGRATE_UP:        viper.GetBool("MIGRATE_UP"),
+		MIGRATE_VERSION:   viper.GetInt("MIGRATE_VERSION"),
 	}
 
 	cache_cfg := CacheConfiguration{
@@ -149,7 +156,7 @@ func LoadConfig(path string) (cfg Configuration, err error) {
 
 	grpc_server_cfg := GRPCServerConfiguration{
 		GRPC_SERVER_ADDRESS:   viper.GetString("GRPC_SERVER_ADDRESS"),
-		GRPC_SERVER_PORT:      viper.GetString("GRPC_SERVER_PORT"),
+		GRPC_SERVER_PORT:      viper.GetInt("GRPC_SERVER_PORT"),
 		GRPC_ENVIRONMENT:      viper.GetString("GRPC_ENVIRONMENT"),
 		GRPC_VERSION:          viper.GetString("GRPC_VERSION"),
 		GRPC_EXTERNAL_ADDRESS: viper.GetString("GRPC_EXTERNAL_ADDRESS"),

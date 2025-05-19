@@ -2,9 +2,11 @@ package postgres
 
 import (
 	"context"
-	"log"
 	"embed"
+	"errors"
 	"fmt"
+	"io"
+	"log"
 
 	"os"
 	"time"
@@ -20,7 +22,7 @@ import (
 var embedMigrations embed.FS
 
 type DB struct {
-	*pgxpool.Pool
+	DB *pgxpool.Pool
 	url string
 }
 
@@ -43,19 +45,92 @@ func New(
 	config.MaxConns = int32(maxOpenConns)
 	config.MaxConnIdleTime = maxIdleTime
 	config.MinIdleConns = int32(minIdleConns)
+	config.HealthCheckPeriod = 2 * time.Second
 
 	db, err := pgxpool.NewWithConfig(context.Background(), config)
 	if err != nil {
 		return nil, err
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-	if err := db.Ping(ctx); err != nil {
+
+	dbObject := DB{
+		db,
+		connectionString,
+	}
+	err = dbObject.checkConnection(context.Background())
+	if err != nil {
 		return nil, err
 	}
+	go dbObject.startHealthCheck(context.Background())
 
-	return &DB{db, connectionString}, nil
+	return &dbObject, nil
+}
+
+func (db *DB) startHealthCheck(ctx context.Context) {
+	ticker := time.NewTicker(db.DB.Config().HealthCheckPeriod)
+	defer ticker.Stop()
+	
+	for {
+		select {
+		case <-ticker.C:
+			if err := db.checkConnection(ctx); err != nil {
+				log.Printf("DB health check failed: %v", err)
+				// Force reconnection attempt
+				db.reconnect(ctx)
+			}
+		case <-ctx.Done():
+			log.Println("Stopping DB health check")
+			return
+		}
+	}
+}
+
+// checkConnection verifies if the database connection is still alive
+func (dm *DB) checkConnection(ctx context.Context) error {
+	// Create timeout context for the ping
+	pingCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	
+	// Use Ping to verify connection
+	err := dm.DB.Ping(pingCtx)
+	if err != nil {
+		return err
+	}
+	
+	// Optionally perform a simple query to further verify connection
+	conn, err := dm.DB.Acquire(pingCtx)
+	if err != nil {
+		return err
+	}
+	defer conn.Release()
+	
+	var result int
+	err = conn.QueryRow(pingCtx, "SELECT 1").Scan(&result)
+	if err != nil {
+		return err
+	}
+	
+	return nil
+}
+
+// reconnect attempts to reconnect to the database by closing and recreating the pool
+func (dm *DB) reconnect(ctx context.Context) {
+	log.Println("Attempting to reconnect to database...")
+	
+	// Close existing pool if it exists
+	if dm != nil {
+		dm.DB.Close()
+	}
+	db, err := pgxpool.NewWithConfig(ctx, dm.DB.Config())
+	ctx, cancel := context.WithTimeout(ctx, 2*time.Second)
+	defer cancel()
+	err = db.Ping(ctx)
+	if err != nil {
+		log.Printf("Failed to reconnect: %v", err)
+	} else {
+		dm.DB = db
+		log.Println("Successfully reconnected to database")
+	}
 }
 
 func (db *DB) MigrateUpTo(version int) error {
@@ -94,11 +169,45 @@ func (db *DB) MigrateUpTo(version int) error {
 	return nil
 }
 
-// TODO: reference: https://stackoverflow.com/questions/76865674/how-to-use-goose-migrations-with-pgx
-// TODO: reference: https://github.com/bagashiz/go-pos/blob/main/internal/adapter/storage/postgres/db.go
-
+// ErrorCode extracts the Postgres error code from different types of pgx errors
 func (db *DB) ErrorCode(err error) string {
-	pgErr := err.(*pgconn.PgError)
-	return pgErr.Code
+    if err == nil {
+        return ""
+    }
+    
+    // Handle PgError (for query errors, constraint violations, etc.)
+    var pgErr *pgconn.PgError
+    if errors.As(err, &pgErr) {
+        return pgErr.Code
+    }
+    
+    // Handle ConnectError (for connection failures)
+    var connectErr *pgconn.ConnectError
+    if errors.As(err, &connectErr) {
+        // ConnectError doesn't have a Code field directly
+        // So we'll return a custom code for connection errors
+        return "connection_error"
+    }
+    
+    // Try to check for errors implementing the PostgreSQL error interface
+    type pgxErrorCode interface {
+        SQLState() string
+    }
+    
+    var sqlStateErr pgxErrorCode
+    if errors.As(err, &sqlStateErr) {
+        return sqlStateErr.SQLState()
+    }
+    
+    // Additional checks for network-related errors
+    if errors.Is(err, context.DeadlineExceeded) {
+        return "timeout_error"
+    }
+    
+    if errors.Is(err, io.EOF) || errors.Is(err, io.ErrUnexpectedEOF) {
+        return "connection_closed"
+    }
+    
+    // Default case - unknown error type
+    return "unknown_error"
 }
-
