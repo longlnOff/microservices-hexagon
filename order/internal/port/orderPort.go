@@ -10,7 +10,7 @@ import (
 
 // CategoryRepository is an interface for interacting with category-related data
 type OrderRepository interface {
-	Get(ctx context.Context, id string) (domain.Order, error)
+	Get(ctx context.Context, id int) (domain.Order, error)
 	Save(context.Context, *domain.Order) error
 }
 // OrderService is an interface for interacting with category-related business logic

@@ -7,11 +7,12 @@ import (
 )
 
 type Configuration struct {
-	Server   ServerConfiguration
-	Database DatabaseConfiguration
-	Cache    CacheConfiguration
-	Mail     MailConfiguration
-	Auth     AuthConfiguration
+	GRPCServer 		GRPCServerConfiguration
+	HTTPServer   	HTTPServerConfiguration
+	Database 		DatabaseConfiguration
+	Cache    		CacheConfiguration
+	Mail     		MailConfiguration
+	Auth     		AuthConfiguration
 }
 
 type CacheConfiguration struct {
@@ -52,7 +53,7 @@ type MailTrapConfiguration struct {
 	API_KEY string `mapstructure:"MAIL_TRAP_API_KEY"`
 }
 
-type ServerConfiguration struct {
+type HTTPServerConfiguration struct {
 	SERVER_ADDRESS   string `mapstructure:"SERVER_ADDRESS"`
 	SERVER_PORT      string `mapstructure:"SERVER_PORT"`
 	ENVIRONMENT      string `mapstructure:"ENVIRONMENT"`
@@ -60,6 +61,15 @@ type ServerConfiguration struct {
 	EXTERNAL_ADDRESS string `mapstructure:"EXTERNAL_ADDRESS"`
 	EXTERNAL_PORT    string `mapstructure:"EXTERNAL_PORT"`
 	FRONTEND_URL     string `mapstructure:"FRONTEND_URL"`
+}
+
+type GRPCServerConfiguration struct {
+	GRPC_SERVER_ADDRESS   string `mapstructure:"GRPC_SERVER_ADDRESS"`
+	GRPC_SERVER_PORT      string `mapstructure:"GRPC_SERVER_PORT"`
+	GRPC_ENVIRONMENT      string `mapstructure:"GRPC_ENVIRONMENT"`
+	GRPC_VERSION          string `mapstructure:"GRPC_VERSION"`
+	GRPC_EXTERNAL_ADDRESS string `mapstructure:"GRPC_EXTERNAL_ADDRESS"`
+	GRPC_EXTERNAL_PORT    string `mapstructure:"GRPC_EXTERNAL_PORT"`
 }
 
 type DatabaseConfiguration struct {
@@ -107,7 +117,7 @@ func LoadConfig(path string) (cfg Configuration, err error) {
 		},
 	}
 
-	server_cfg := ServerConfiguration{
+	http_server_cfg := HTTPServerConfiguration{
 		SERVER_ADDRESS:   viper.GetString("SERVER_ADDRESS"),
 		SERVER_PORT:      viper.GetString("SERVER_PORT"),
 		ENVIRONMENT:      viper.GetString("ENVIRONMENT"),
@@ -137,8 +147,18 @@ func LoadConfig(path string) (cfg Configuration, err error) {
 		CACHE_ENABLED:  viper.GetBool("CACHE_ENABLED"),
 	}
 
+	grpc_server_cfg := GRPCServerConfiguration{
+		GRPC_SERVER_ADDRESS:   viper.GetString("GRPC_SERVER_ADDRESS"),
+		GRPC_SERVER_PORT:      viper.GetString("GRPC_SERVER_PORT"),
+		GRPC_ENVIRONMENT:      viper.GetString("GRPC_ENVIRONMENT"),
+		GRPC_VERSION:          viper.GetString("GRPC_VERSION"),
+		GRPC_EXTERNAL_ADDRESS: viper.GetString("GRPC_EXTERNAL_ADDRESS"),
+		GRPC_EXTERNAL_PORT:    viper.GetString("GRPC_EXTERNAL_PORT"),
+	}
+
 	return Configuration{
-		Server:   server_cfg,
+		GRPCServer:   grpc_server_cfg,
+		HTTPServer:   http_server_cfg,
 		Database: database_cfg,
 		Cache:    cache_cfg,
 		Mail:     mail_cfg,
