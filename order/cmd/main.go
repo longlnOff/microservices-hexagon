@@ -2,9 +2,11 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/longlnOff/microservices-hexagon/order/configuration"
 	"github.com/longlnOff/microservices-hexagon/order/internal/adapter/handler/grpc"
 	"github.com/longlnOff/microservices-hexagon/order/internal/adapter/logger"
+	"github.com/longlnOff/microservices-hexagon/order/internal/adapter/payment"
 	"github.com/longlnOff/microservices-hexagon/order/internal/adapter/storage/cache"
 	"github.com/longlnOff/microservices-hexagon/order/internal/adapter/storage/postgres"
 	"github.com/longlnOff/microservices-hexagon/order/internal/adapter/storage/postgres/repository"
@@ -65,9 +67,12 @@ func main() {
 		}
 	}
 
-
+	paymentAdapter, err := payment.NewAdapter(cfg.Payment.PAYMENT_SERVICE_ADDRESS)
+	if err != nil {
+		logger.Fatal("Failed to connect to payment service", zap.Error(err))
+	}
 	orderRepository := repository.NewOrderRepository(database)
-	orderService := service.NewOrderService(orderRepository, cacheClient)
+	orderService := service.NewOrderService(orderRepository, cacheClient, paymentAdapter)
 	grpcServer := grpc.NewGRPCServer(
 		cfg,
 		logger,

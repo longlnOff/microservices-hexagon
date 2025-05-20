@@ -11,8 +11,13 @@ type Configuration struct {
 	HTTPServer   	HTTPServerConfiguration
 	Database 		DatabaseConfiguration
 	Cache    		CacheConfiguration
+	Payment			PaymentConfiguration
 	Mail     		MailConfiguration
 	Auth     		AuthConfiguration
+}
+
+type PaymentConfiguration struct {
+	PAYMENT_SERVICE_ADDRESS string `mapstructure:"PAYMENT_SERVICE_ADDRESS"`
 }
 
 type CacheConfiguration struct {
@@ -163,11 +168,16 @@ func LoadConfig(path string, useAbsPath bool) (cfg Configuration, err error) {
 		GRPC_EXTERNAL_PORT:    viper.GetString("GRPC_EXTERNAL_PORT"),
 	}
 
+	payment_service_cfg := PaymentConfiguration{
+		PAYMENT_SERVICE_ADDRESS: viper.GetString("PAYMENT_SERVICE_ADDRESS"),
+	}
+
 	return Configuration{
 		GRPCServer:   grpc_server_cfg,
 		HTTPServer:   http_server_cfg,
 		Database: database_cfg,
 		Cache:    cache_cfg,
+		Payment:  payment_service_cfg,
 		Mail:     mail_cfg,
 		Auth:     AuthConfiguration{Basic: basicAuth, Token: tokenAuth},
 	}, nil
